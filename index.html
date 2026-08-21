@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workforce Analytics - Login</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); width: 300px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;}
+        button { width: 100%; padding: 10px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;}
+        button:hover { background-color: #218838; }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+        <h2>Stark Industries</h2>
+        <form action="http://localhost:8080/api/login" method="POST">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required placeholder="t.stark@starkindustries.com">
+            
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required placeholder="Enter password">
+            
+            <button type="submit">Log In</button>
+            <a href="signup.html" style="display: block; text-align: center; margin-top: 15px; color: #007bff; text-decoration: none;">Need an account? Sign Up</a>
+        </form>
+    </div>
+
+</body>
+</html>
