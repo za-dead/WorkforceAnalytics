@@ -1,18 +1,20 @@
-## Getting Started
+# Workforce Analytics System
 
-Welcome to the VS Code Java world. Here is a guideline to help you get started to write Java code in Visual Studio Code.
+A custom Java and JDBC web application for employee and department management, as a lab project for 'Databse Systems' course completed in Brac University. 
 
-## Folder Structure
+## Quick Start Guide
 
-The workspace contains two folders by default, where:
+**1. Setup the Database**
+* Start Apache and MySQL in XAMPP Control Panel.
+* Go to `http://localhost/phpmyadmin` and create a new database named **`workforce_analytics`**.
+* Import the included `workforce_analytics.sql` file into this new database.
 
-- `src`: the folder to maintain sources
-- `lib`: the folder to maintain dependencies
+**2. Run the Backend**
+* Open the project folder in VS Code.
+* Open `src/App.java` and click **Run** to start the local HTTP server.
 
-Meanwhile, the compiled output files will be generated in the `bin` folder by default.
+**3. Launch the App**
+* Open `index.html` directly in a web browser.
+* **Test Account:** `t.stark@starkindustries.com` | Password: `ironman`
 
-> If you want to customize the folder structure, open `.vscode/settings.json` and update the related settings there.
-
-## Dependency Management
-
-The `JAVA PROJECTS` view allows you to manage your dependencies. More details can be found [here](https://github.com/microsoft/vscode-java-dependency#manage-dependencies).
+DONE.
