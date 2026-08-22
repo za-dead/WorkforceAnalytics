@@ -66,10 +66,15 @@ public class SimpleWebServer{
                                    "<p><b>Role:</b> " + emp.getRole() + "</p>" +
                                    "<p><b>" + supervisorDisplay + "</b></p>" +
                                    "<p><b>Project:</b> " + projName + " (ID: " + emp.getProjectId() + ")</p>" +
-                                   "<p><b>Current Task:</b> " + taskDetails + "</p>";
+                                   "<p><b>Current Task:</b> " + taskDetails + "</p>" +
+                                   "<br>" +
+                                   "<button style='padding: 10px; background: #dc3545; color: white; border: none; cursor: pointer;' " +
+                                   "onclick='window.history.back()'>Logout</button>";
                 }
                 else{
-                    htmlResponse = "<h2>Login Failed</h2><p>Invalid email or password. Please try again.</p>";
+                    htmlResponse = "<h2>Login Failed</h2><p>Invalid email or password. Please try again.</p>" +
+                                   "<br><button style='padding: 10px; background: #6c757d; color: white; border: none; cursor: pointer;' " +
+                                   "onclick='window.history.back()'>Go Back</button>";
                 }
 
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
