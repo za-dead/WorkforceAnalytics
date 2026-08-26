@@ -199,32 +199,27 @@ public class AuthService{
         return html.toString();
     }
 
-    public boolean assignEmployeeToProject(int employeeId, int projectId, String taskDescription){
-        // update in the employee tzble
+    public boolean assignEmployeeToProject(int employeeId, int projectId, String taskName, String deadline){
         String updateEmpQuery = "UPDATE EMPLOYEE SET Project_ID = ? WHERE Employee_ID = ?";
         
-        // overwrite or insert the new task in the task table
-        // overwrite or insert the new task, and force the status to pending
-        String upsertTaskQuery = "INSERT INTO TASK (Employee_ID, Project_ID, Task_Name, Status) VALUES (?, ?, ?, 'Pending') " +
-                                 "ON DUPLICATE KEY UPDATE Project_ID = VALUES(Project_ID), Task_Name = VALUES(Task_Name), Status = 'Pending'";
+        String upsertTaskQuery = "INSERT INTO TASK (Employee_ID, Project_ID, Task_Name, Status, Deadline) VALUES (?, ?, ?, 'Pending', ?) " +
+                                 "ON DUPLICATE KEY UPDATE Project_ID = VALUES(Project_ID), Task_Name = VALUES(Task_Name), Status = 'Pending', Deadline = VALUES(Deadline)";
                                  
         try(Connection conn = DatabaseConnection.getConnection();
         PreparedStatement empStmt = conn.prepareStatement(updateEmpQuery);
-        PreparedStatement taskStmt = conn.prepareStatement(upsertTaskQuery)) {
+        PreparedStatement taskStmt = conn.prepareStatement(upsertTaskQuery)){
              
-            // execute employee update
             empStmt.setInt(1, projectId);
             empStmt.setInt(2, employeeId);
             empStmt.executeUpdate();
             
-            // execute task upsert
             taskStmt.setInt(1, employeeId);
             taskStmt.setInt(2, projectId);
-            taskStmt.setString(3, taskDescription);
+            taskStmt.setString(3, taskName);
+            taskStmt.setString(4, deadline);
             taskStmt.executeUpdate();
             
-            return true; // successfully updated both tables
-            
+            return true;
         }
         catch(SQLException e){
             System.out.println("Database error during task assignment:");
@@ -234,20 +229,52 @@ public class AuthService{
     }
 
     public boolean createProject(String projectName, int departmentId){
-    String query = "INSERT INTO PROJECT (Project_Name, Department_ID) VALUES (?, ?)";
-    try(Connection conn = DatabaseConnection.getConnection();
-    PreparedStatement stmt = conn.prepareStatement(query)){
+        String query = "INSERT INTO PROJECT (Project_Name, Department_ID) VALUES (?, ?)";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
         
-        stmt.setString(1, projectName);
-        stmt.setInt(2, departmentId);
+            stmt.setString(1, projectName);
+            stmt.setInt(2, departmentId);
         
-        int rowsInserted = stmt.executeUpdate();
-        return rowsInserted>0;
+            int rowsInserted = stmt.executeUpdate();
+            return rowsInserted>0;
+        }
+        catch(SQLException e){
+            System.out.println("Database error during project creation:");
+            e.printStackTrace();
+            return false;
+        }
     }
-    catch(SQLException e){
-        System.out.println("Database error during project creation:");
-        e.printStackTrace();
-        return false;
+
+    public boolean hasIncompleteTask(int employeeId){
+        String query = "SELECT Status FROM TASK WHERE Employee_ID = ? AND Status != 'Completed'";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            // true means pending or in progress task
+            return rs.next(); 
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return true; // assume they are busy if the database throws an error
+        }
     }
-}
+
+    public boolean completeTask(int employeeId){
+        String query = "UPDATE TASK SET Status = 'Completed' WHERE Employee_ID = ? AND Status != 'Completed'";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)) {
+             
+            stmt.setInt(1, employeeId);
+            int rowsUpdated = stmt.executeUpdate();
+            
+            return rowsUpdated > 0; // returns true if a task was actually updated
+        }
+        catch(SQLException e){
+            System.out.println("Database error during task completion:");
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

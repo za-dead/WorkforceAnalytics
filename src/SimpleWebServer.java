@@ -21,6 +21,7 @@ public class SimpleWebServer{
             server.createContext("/api/signup", new SignupHandler());
             server.createContext("/api/assign", new AssignTaskHandler());
             server.createContext("/api/createProject", new CreateProjectHandler());
+            server.createContext("/api/completeTask", new CompleteTaskHandler());
             
             server.setExecutor(null); 
             server.start();
@@ -93,7 +94,9 @@ public class SimpleWebServer{
                                         projDropdown +
                                         "</select>" +
                                         
+                                        "</select>" +
                                         "<input type='text' name='taskDesc' placeholder='Task Description...' required style='padding: 8px; margin-right: 5px; width: 200px;'>" +
+                                        "<input type='date' name='deadline' required style='padding: 8px; margin-right: 5px;'>" +
                                         "<button type='submit' style='padding: 9px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 3px;'>Assign Task</button>" +
                                         "</form>" +
                                         "</div>" +
@@ -107,7 +110,7 @@ public class SimpleWebServer{
                                         "</form>" +
                                         "</div>";
                     }
-                    else{
+                    else {
                         // regular employee Interface
                         String projName = (emp.getProjectId() == 0) ? "Not Assigned Yet" : auth.getProjectName(emp.getProjectId());
                         String taskDetails = (emp.getProjectId() == 0) ? "Awaiting Assignment" : auth.getTaskDetails(emp.getEmployeeId());
@@ -115,6 +118,14 @@ public class SimpleWebServer{
                         htmlResponse += "<hr><h3>Your Work</h3>" +
                                         "<p><b>Project:</b> " + projName + "</p>" +
                                         "<p><b>Current Task:</b> " + taskDetails + "</p>";
+                                        
+                        // only show the complete button if they actually have an incomplete task
+                        if(auth.hasIncompleteTask(emp.getEmployeeId())){
+                            htmlResponse += "<form action='/api/completeTask' method='POST' style='margin-top: 15px;'>" +
+                                            "<input type='hidden' name='empId' value='" + emp.getEmployeeId() + "'>" +
+                                            "<button type='submit' style='padding: 8px 15px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 3px;'>Mark Task as Completed</button>" +
+                                            "</form>";
+                        }
                     }
 
                     // logout Button for everyone
@@ -165,16 +176,7 @@ public class SimpleWebServer{
                 
                 // auto assign supervisor
                 int assignedSupervisor;
-                switch (deptId) {
-                    case 1: assignedSupervisor = 1; break;  
-                    case 2: assignedSupervisor = 5; break;  
-                    case 3: assignedSupervisor = 9; break;  
-                    case 4: assignedSupervisor = 13; break; 
-                    case 5: assignedSupervisor = 17; break; 
-                    default: assignedSupervisor = 1; break; 
-                }
-                newEmp.setSupervisorId(assignedSupervisor); 
-                newEmp.setProjectId(0);switch (deptId) {
+                switch (deptId){
                     case 1: assignedSupervisor = 1; break;  
                     case 2: assignedSupervisor = 5; break;  
                     case 3: assignedSupervisor = 9; break;  
@@ -235,36 +237,43 @@ public class SimpleWebServer{
         public void handle(HttpExchange exchange) throws IOException{
             if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
                 
-                // read the incoming input form data
                 InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                 BufferedReader br = new BufferedReader(isr);
                 String formData = br.readLine();
                 
-                // parse the dynamic dropdowns and text input
                 Map<String, String> inputs = parseFormData(formData);
                 int targetEmpId = Integer.parseInt(inputs.get("targetEmpId"));
                 int targetProjId = Integer.parseInt(inputs.get("targetProjId"));
                 String taskDesc = inputs.get("taskDesc");
+                String deadline = inputs.get("deadline");
                 
-                // execute database updste
                 AuthService auth = new AuthService();
-                boolean success = auth.assignEmployeeToProject(targetEmpId, targetProjId, taskDesc);
-                
-                // building success/failure response screen
                 String htmlResponse;
-                if(success){
-                    htmlResponse = "<h2>Assignment Successful!</h2>" +
-                                   "<p>The employee has been successfully assigned to their new project and task.</p>" +
-                                   "<br><button style='padding: 10px; background: #28a745; color: white; border: none; cursor: pointer;' " +
-                                   "onclick='window.history.back()'>Go Back to Dashboard</button>";
-                }
-                else{
-                    htmlResponse = "<h2>Assignment Failed</h2><p>There was a database error. Please check your VS Code terminal.</p>" +
-                                   "<br><button style='padding: 10px; background: #6c757d; color: white; border: none; cursor: pointer;' " +
+                
+                // deadline checking
+                if (auth.hasIncompleteTask(targetEmpId)) {
+                    htmlResponse = "<h2>Assignment Blocked</h2>" +
+                                   "<p>This employee already has a task that is not complete yet.</p>" +
+                                   "<br><button style='padding: 10px; background: #ffc107; color: black; border: none; cursor: pointer;' " +
                                    "onclick='window.history.back()'>Go Back</button>";
                 }
+                else{
+                    // if they are free
+                    boolean success = auth.assignEmployeeToProject(targetEmpId, targetProjId, taskDesc, deadline);
+                    
+                    if(success){
+                        htmlResponse = "<h2>Assignment Successful!</h2>" +
+                                       "<p>The employee has been successfully assigned to their new project and task.</p>" +
+                                       "<br><button style='padding: 10px; background: #28a745; color: white; border: none; cursor: pointer;' " +
+                                       "onclick='window.history.back()'>Go Back to Dashboard</button>";
+                    }
+                    else{
+                        htmlResponse = "<h2>Assignment Failed</h2><p>There was a database error. Please check your VS Code terminal.</p>" +
+                                       "<br><button style='padding: 10px; background: #6c757d; color: white; border: none; cursor: pointer;' " +
+                                       "onclick='window.history.back()'>Go Back</button>";
+                    }
+                }
                 
-                // send it back to the browser
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
                 exchange.sendResponseHeaders(200, htmlResponse.length());
                 OutputStream os = exchange.getResponseBody();
@@ -305,6 +314,43 @@ public class SimpleWebServer{
                                    "onclick='window.history.back()'>Go Back</button>";
                 }
             
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    static class CompleteTaskHandler implements HttpHandler{
+        @Override
+        public void handle(HttpExchange exchange) throws IOException{
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())){
+                
+                InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                BufferedReader br = new BufferedReader(isr);
+                String formData = br.readLine();
+                
+                Map<String, String> inputs = parseFormData(formData);
+                int empId = Integer.parseInt(inputs.get("empId"));
+                
+                AuthService auth = new AuthService();
+                boolean success = auth.completeTask(empId);
+                
+                String htmlResponse;
+                if(success){
+                    htmlResponse = "<h2>Task Completed!</h2>" +
+                                   "<p>Great job! Your supervisor will now see that you have finished your work.</p>" +
+                                   "<br><button style='padding: 10px; background: #28a745; color: white; border: none; cursor: pointer;' " +
+                                   "onclick='window.history.back()'>Go Back to Dashboard</button>";
+                }
+                else{
+                    htmlResponse = "<h2>Update Failed</h2><p>Could not update the task status. Please try again.</p>" +
+                                   "<br><button style='padding: 10px; background: #6c757d; color: white; border: none; cursor: pointer;' " +
+                                   "onclick='window.history.back()'>Go Back</button>";
+                }
+                
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
                 exchange.sendResponseHeaders(200, htmlResponse.length());
                 OutputStream os = exchange.getResponseBody();
