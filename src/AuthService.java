@@ -49,8 +49,7 @@ public class AuthService{
         String query = "INSERT INTO EMPLOYEE (Employee_ID, First_Name, Last_Name, Email, Password, Role, Status, Department_ID, Project_ID, Supervisor_ID) " +
                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
-        try(Connection conn = DatabaseConnection.getConnection();
-             
+        try (Connection conn = DatabaseConnection.getConnection();
         PreparedStatement stmt = conn.prepareStatement(query)){
             
             stmt.setInt(1, newEmp.getEmployeeId());
@@ -61,8 +60,16 @@ public class AuthService{
             stmt.setString(6, newEmp.getRole());
             stmt.setString(7, newEmp.getStatus());
             stmt.setInt(8, newEmp.getDepartmentId());
-            stmt.setInt(9, newEmp.getProjectId());
             
+            // project null check
+            if(newEmp.getProjectId() == 0){
+                stmt.setNull(9, java.sql.Types.INTEGER);       // inserting null into the database
+            }
+            else{
+                stmt.setInt(9, newEmp.getProjectId());
+            }
+            
+            // supervisor null chek
             if(newEmp.getSupervisorId() != null){
                 stmt.setInt(10, newEmp.getSupervisorId());
             }
@@ -139,7 +146,7 @@ public class AuthService{
         return null;
     }
 
-    public String getTaskDetails(int employeeId) {
+    public String getTaskDetails(int employeeId){
         // looks for their first incomplete task
         String query = "SELECT Task_ID, Task_Name FROM TASK WHERE Employee_ID = ? AND Status != 'Completed' LIMIT 1";
         try(Connection conn = DatabaseConnection.getConnection();
@@ -151,4 +158,96 @@ public class AuthService{
         catch(SQLException e) { e.printStackTrace(); }
         return "No pending tasks at the moment.";
     }
+
+    // generates html options for employees in a specific department.. except the boss
+    public String getEmployeeDropdownHTML(int departmentId, int supervisorId){
+        StringBuilder html = new StringBuilder();
+        String query = "SELECT Employee_ID, First_Name, Last_Name FROM EMPLOYEE WHERE Department_ID = ? AND Employee_ID != ?";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+            stmt.setInt(1, departmentId);
+            stmt.setInt(2, supervisorId); // supervisor wont assign tasks to himself
+            ResultSet rs = stmt.executeQuery();
+            while(rs.next()){
+                html.append("<option value='").append(rs.getInt("Employee_ID")).append("'>")
+                    .append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name"))
+                    .append("</option>");
+            }
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+        }
+        return html.toString();
+    }
+
+    // generates html options for projects in a specific department
+    public String getProjectDropdownHTML(int departmentId){
+        StringBuilder html = new StringBuilder();
+        String query = "SELECT Project_ID, Project_Name FROM PROJECT WHERE Department_ID = ?";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)) {
+            stmt.setInt(1, departmentId);
+            ResultSet rs = stmt.executeQuery();
+            while(rs.next()){
+                html.append("<option value='").append(rs.getInt("Project_ID")).append("'>")
+                    .append(rs.getString("Project_Name")).append("</option>");
+            }
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+        }
+        return html.toString();
+    }
+
+    public boolean assignEmployeeToProject(int employeeId, int projectId, String taskDescription){
+        // update in the employee tzble
+        String updateEmpQuery = "UPDATE EMPLOYEE SET Project_ID = ? WHERE Employee_ID = ?";
+        
+        // overwrite or insert the new task in the task table
+        // overwrite or insert the new task, and force the status to pending
+        String upsertTaskQuery = "INSERT INTO TASK (Employee_ID, Project_ID, Task_Name, Status) VALUES (?, ?, ?, 'Pending') " +
+                                 "ON DUPLICATE KEY UPDATE Project_ID = VALUES(Project_ID), Task_Name = VALUES(Task_Name), Status = 'Pending'";
+                                 
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement empStmt = conn.prepareStatement(updateEmpQuery);
+        PreparedStatement taskStmt = conn.prepareStatement(upsertTaskQuery)) {
+             
+            // execute employee update
+            empStmt.setInt(1, projectId);
+            empStmt.setInt(2, employeeId);
+            empStmt.executeUpdate();
+            
+            // execute task upsert
+            taskStmt.setInt(1, employeeId);
+            taskStmt.setInt(2, projectId);
+            taskStmt.setString(3, taskDescription);
+            taskStmt.executeUpdate();
+            
+            return true; // successfully updated both tables
+            
+        }
+        catch(SQLException e){
+            System.out.println("Database error during task assignment:");
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public boolean createProject(String projectName, int departmentId){
+    String query = "INSERT INTO PROJECT (Project_Name, Department_ID) VALUES (?, ?)";
+    try(Connection conn = DatabaseConnection.getConnection();
+    PreparedStatement stmt = conn.prepareStatement(query)){
+        
+        stmt.setString(1, projectName);
+        stmt.setInt(2, departmentId);
+        
+        int rowsInserted = stmt.executeUpdate();
+        return rowsInserted>0;
+    }
+    catch(SQLException e){
+        System.out.println("Database error during project creation:");
+        e.printStackTrace();
+        return false;
+    }
+}
 }

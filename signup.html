@@ -23,7 +23,14 @@
             <input type="email" name="email" required placeholder="Email Address">
             <input type="password" name="password" required placeholder="Create Password">
             <input type="text" name="role" required placeholder="Job Role (e.g., Developer)">
-            <input type="number" name="departmentId" required placeholder="Dept ID (1-5)">
+            <select name="departmentId" required style="padding: 10px; margin-bottom: 15px; width: 100%; border: 1px solid #ccc; border-radius: 4px; font-family: inherit;">
+                <option value="" disabled selected>Select your Department...</option>
+                <option value="1">1 - Software Engineering</option>
+                <option value="2">2 - Artificial Intelligence</option>
+                <option value="3">3 - Cybersecurity</option>
+                <option value="4">4 - Data Science</option>
+                <option value="5">5 - Cloud Infrastructure</option>
+            </select>
             
             <button type="submit">Create Account</button>
         </form>
