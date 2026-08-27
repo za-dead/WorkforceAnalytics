@@ -17,11 +17,13 @@ public class SimpleWebServer{
         try{
             HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);     // create listening on port 8080
             
-            server.createContext("/api/login", new LoginHandler());            // endpoint for login to subm,mit
+            server.createContext("/api/login", new LoginHandler());           
             server.createContext("/api/signup", new SignupHandler());
             server.createContext("/api/assign", new AssignTaskHandler());
             server.createContext("/api/createProject", new CreateProjectHandler());
             server.createContext("/api/completeTask", new CompleteTaskHandler());
+            server.createContext("/api/departmentUpdates", new DepartmentUpdatesHandler());
+            server.createContext("/api/projectProgress", new ProjectProgressHandler());
             
             server.setExecutor(null); 
             server.start();
@@ -71,30 +73,50 @@ public class SimpleWebServer{
                                    "<p><b>" + supervisorDisplay + "</b></p>";
                     
                     // role based dashboard split
-                    if (isSupervisor) {
-                        // fetching the dynamic html dropdown lists from the database
+                    if(isSupervisor){
+                        // fetching dynamic html dropdown lists from  database
                         String empDropdown = auth.getEmployeeDropdownHTML(emp.getDepartmentId(), emp.getEmployeeId());
                         String projDropdown = auth.getProjectDropdownHTML(emp.getDepartmentId());
 
-                        // functional supervisor control panel with dynamic <select> menus
+                        // functional supervisor control panel
+                        // functional supervisor control panel
                         htmlResponse += "<hr><h3>Supervisor Control Panel</h3>" +
+
+                                        // side by side button
+                                        "<div style='display: flex; gap: 10px; margin-bottom: 20px;'>" +
+                                        
+                                        // button 1 task updates
+                                        "<form action='/api/departmentUpdates' method='POST' style='margin: 0;'>" +
+                                        "<input type='hidden' name='supervisorId' value='" + emp.getEmployeeId() + "'>" +
+                                        "<button type='submit' style='padding: 10px 20px; background: #6f42c1; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 14px;'>" +
+                                        "View Department Project & Task Updates</button>" +
+                                        "</form>" +
+                                        
+                                        // button 2 progress ananlytics
+                                        "<form action='/api/projectProgress' method='POST' style='margin: 0;'>" +
+                                        "<input type='hidden' name='deptId' value='" + emp.getDepartmentId() + "'>" +
+                                        "<input type='hidden' name='deptName' value='" + deptName + "'>" + // Passing department name for the header
+                                        "<button type='submit' style='padding: 10px 20px; background: #17a2b8; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 14px;'>" +
+                                        "View Project Completion Progress</button>" +
+                                        "</form>" +
+                                        
+                                        "</div>" +
+
+                                        // assign project and tasks part
                                         "<div style='background: #f4f4f4; padding: 15px; border-radius: 5px; margin-bottom: 15px;'>" +
                                         "<h4>Assign Employee to Project & Task</h4>" +
                                         "<form action='/api/assign' method='POST'>" +
                                         
-                                        // dynamic employee dropdown
                                         "<select name='targetEmpId' required style='padding: 8px; margin-right: 5px; width: 180px;'>" +
                                         "<option value='' disabled selected>Select Employee...</option>" +
                                         empDropdown +
                                         "</select>" +
                                         
-                                        // dynamic project dropdown
                                         "<select name='targetProjId' required style='padding: 8px; margin-right: 5px; width: 180px;'>" +
                                         "<option value='' disabled selected>Select Project...</option>" +
                                         projDropdown +
                                         "</select>" +
                                         
-                                        "</select>" +
                                         "<input type='text' name='taskDesc' placeholder='Task Description...' required style='padding: 8px; margin-right: 5px; width: 200px;'>" +
                                         "<input type='date' name='deadline' required style='padding: 8px; margin-right: 5px;'>" +
                                         "<button type='submit' style='padding: 9px 15px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 3px;'>Assign Task</button>" +
@@ -110,7 +132,7 @@ public class SimpleWebServer{
                                         "</form>" +
                                         "</div>";
                     }
-                    else {
+                    else{
                         // regular employee Interface
                         String projName = (emp.getProjectId() == 0) ? "Not Assigned Yet" : auth.getProjectName(emp.getProjectId());
                         String taskDetails = (emp.getProjectId() == 0) ? "Awaiting Assignment" : auth.getTaskDetails(emp.getEmployeeId());
@@ -350,6 +372,102 @@ public class SimpleWebServer{
                                    "<br><button style='padding: 10px; background: #6c757d; color: white; border: none; cursor: pointer;' " +
                                    "onclick='window.history.back()'>Go Back</button>";
                 }
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    static class DepartmentUpdatesHandler implements HttpHandler{
+        @Override
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
+                InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                BufferedReader br = new BufferedReader(isr);
+                String formData = br.readLine();
+                
+                Map<String, String> inputs = parseFormData(formData);
+                int supervisorId = Integer.parseInt(inputs.get("supervisorId"));
+                
+                AuthService auth = new AuthService();
+                String completedTasksHTML = auth.getCompletedTasksByProjectHTML(supervisorId);
+                String runningTasksHTML = auth.getRunningTasksByProjectHTML(supervisorId);
+                String overdueTasksHTML = auth.getOverdueTasksHTML(supervisorId);
+                
+                String htmlResponse = "<h2>Department Project & Task Updates</h2><hr>" +
+                                      
+                                      // completed Tasks
+                                      "<div style='background: #e9ecef; padding: 15px; border-radius: 5px; margin-bottom: 20px;'>" +
+                                      "<h3 style='margin-top:0; color: #343a40;'>Completed Tasks</h3>" +
+                                      completedTasksHTML +
+                                      "</div>" +
+                                      
+                                      // running Tasks
+                                      "<div style='background: #e2eef9; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid #007bff;'>" +
+                                      "<h3 style='margin-top:0; color: #0056b3;'>Active / Running Tasks</h3>" +
+                                      runningTasksHTML +
+                                      "</div>" +
+                                      
+                                      // overdue alerts
+                                      "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid #ffc107;'>" +
+                                      "<h3 style='margin-top: 0; color: #856404;'>Overdue Task Alerts</h3>" +
+                                      overdueTasksHTML +
+                                      "</div>" +
+                                      
+                                      "<button style='padding: 10px 15px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 3px;' " +
+                                      "onclick='window.history.back()'>Go Back to Dashboard</button>";
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    static class ProjectProgressHandler implements HttpHandler{
+        @Override
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
+                
+                InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                BufferedReader br = new BufferedReader(isr);
+                String formData = br.readLine();
+                
+                Map<String, String> inputs = parseFormData(formData);
+                int deptId = Integer.parseInt(inputs.get("deptId"));
+                String deptName = inputs.get("deptName");
+                
+                AuthService auth = new AuthService();
+                String progressHTML = auth.getProjectProgressHTML(deptId);
+                
+                // stark industries ui temp
+                String htmlResponse = "<html><body style='font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 40px;'>" +
+                                      "<div style='max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);'>" +
+                                      
+                                      // header
+                                      "<div style='text-align: center; border-bottom: 2px solid #343a40; padding-bottom: 20px; margin-bottom: 30px;'>" +
+                                      "<h1 style='margin: 0; color: #343a40; font-size: 36px; letter-spacing: 3px; text-transform: uppercase;'>Stark Industries</h1>" +
+                                      "<h3 style='margin: 10px 0 0 0; color: #6c757d; font-weight: 400; font-size: 20px;'>" + deptName + " - Project Analytics</h3>" +
+                                      "</div>" +
+                                      
+                                      // progress bar injection
+                                      "<div style='margin-bottom: 40px;'>" +
+                                      progressHTML +
+                                      "</div>" +
+                                      
+                                      // back button
+                                      "<div style='text-align: center;'>" +
+                                      "<button style='padding: 12px 30px; background: #343a40; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;' " +
+                                      "onclick='window.history.back()'>Return to Dashboard</button>" +
+                                      "</div>" +
+                                      
+                                      "</div></body></html>";
                 
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
                 exchange.sendResponseHeaders(200, htmlResponse.length());

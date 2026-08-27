@@ -229,15 +229,17 @@ public class AuthService{
     }
 
     public boolean createProject(String projectName, int departmentId){
-        String query = "INSERT INTO PROJECT (Project_Name, Department_ID) VALUES (?, ?)";
+        String query = "INSERT INTO PROJECT (Project_Name, Department_ID, Start_Date) VALUES (?, ?, CURDATE())";
+        
         try(Connection conn = DatabaseConnection.getConnection();
         PreparedStatement stmt = conn.prepareStatement(query)){
-        
+            
             stmt.setString(1, projectName);
             stmt.setInt(2, departmentId);
-        
+            
             int rowsInserted = stmt.executeUpdate();
-            return rowsInserted>0;
+            return rowsInserted > 0;
+            
         }
         catch(SQLException e){
             System.out.println("Database error during project creation:");
@@ -276,5 +278,212 @@ public class AuthService{
             e.printStackTrace();
             return false;
         }
+    }
+
+    public String getOverdueTasksHTML(int supervisorId){
+        StringBuilder html = new StringBuilder();
+        
+        // query finds incomplete tasks where the deadline is older than today, under running supervisor only
+        String query = "SELECT e.First_Name, e.Last_Name, t.Task_Name, t.Deadline " +
+                       "FROM TASK t " +
+                       "JOIN EMPLOYEE e ON t.Employee_ID = e.Employee_ID " +
+                       "WHERE e.Supervisor_ID = ? AND t.Status != 'Completed' AND t.Deadline < CURDATE()";
+                       
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+             
+            stmt.setInt(1, supervisorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            boolean hasOverdue = false;
+            
+            while(rs.next()){
+                if(!hasOverdue){
+                    html.append("<ul style='color: #dc3545; font-weight: bold;'>");        // red tect list
+                    hasOverdue = true;
+                }
+                html.append("<li>")
+                    .append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name"))
+                    .append(" - <i>").append(rs.getString("Task_Name")).append("</i> ")
+                    .append("(Due: ").append(rs.getString("Deadline")).append(")</li>");
+            }
+            
+            if(hasOverdue){
+                html.append("</ul>");
+            }
+            else{
+                html.append("<p style='color: #28a745; font-weight: bold;'>All tasks are currently on schedule!</p>");
+            }
+            
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<p style='color: red;'>Error loading overdue alerts.</p>";
+        }
+        
+        return html.toString();
+    }
+
+    public String getCompletedTasksByProjectHTML(int supervisorId){
+        StringBuilder html = new StringBuilder();
+        
+        String query = "SELECT p.Project_Name, e.First_Name, e.Last_Name, t.Task_Name " +
+                       "FROM TASK t " +
+                       "JOIN EMPLOYEE e ON t.Employee_ID = e.Employee_ID " +
+                       "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
+                       "WHERE e.Supervisor_ID = ? AND t.Status = 'Completed' " +
+                       "ORDER BY p.Project_Name";                // sorting by project groups them together
+                       
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+             
+            stmt.setInt(1, supervisorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            String currentProject = "";
+            boolean hasCompleted = false;
+            
+            while(rs.next()){
+                hasCompleted = true;
+                String projName = rs.getString("Project_Name");
+                
+                // if we looking at a new project, create a new heading!
+                if(!projName.equals(currentProject)){
+                    if(!currentProject.isEmpty()){
+                        html.append("</ul>");     // close previous list
+                    }
+                    html.append("<h4 style='color: #17a2b8; margin-bottom: 5px; margin-top: 15px;'>Project: ").append(projName).append("</h4><ul style='margin-top: 5px;'>");
+                    currentProject = projName;
+                }
+                
+                html.append("<li style='margin-bottom: 5px;'>")
+                    .append("<b>").append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name")).append("</b> finished ")
+                    .append("<i>").append(rs.getString("Task_Name")).append("</i></li>");
+            }
+            
+            if(hasCompleted){
+                html.append("</ul>");
+            }
+            else{
+                html.append("<p style='color: #6c757d; font-style: italic;'>No tasks have been completed yet.</p>");
+            }
+            
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<p style='color: red;'>Error loading completed tasks.</p>";
+        }
+        
+        return html.toString();
+    }
+
+    //collectrs active tasks
+    public String getRunningTasksByProjectHTML(int supervisorId){
+        StringBuilder html = new StringBuilder();
+        
+        // query finds tasks that are NOT completed AND the deadline is today or in the future
+        String query = "SELECT p.Project_Name, e.First_Name, e.Last_Name, t.Task_Name, t.Deadline " +
+                       "FROM TASK t " +
+                       "JOIN EMPLOYEE e ON t.Employee_ID = e.Employee_ID " +
+                       "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
+                       "WHERE e.Supervisor_ID = ? AND t.Status != 'Completed' AND t.Deadline >= CURDATE() " +
+                       "ORDER BY p.Project_Name";
+                       
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+             
+            stmt.setInt(1, supervisorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            String currentProject = "";
+            boolean hasRunning = false;
+            
+            while(rs.next()){
+                hasRunning = true;
+                String projName = rs.getString("Project_Name");
+                
+                // if we hit a new project, create a new heading
+                if(!projName.equals(currentProject)){
+                    if(!currentProject.isEmpty()){
+                        html.append("</ul>"); // close previous list
+                    }
+                    html.append("<h4 style='color: #0056b3; margin-bottom: 5px; margin-top: 15px;'>Project: ").append(projName).append("</h4><ul style='margin-top: 5px;'>");
+                    currentProject = projName;
+                }
+                
+                html.append("<li style='margin-bottom: 5px;'>")
+                    .append("<b>").append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name")).append("</b> is working on ")
+                    .append("<i>").append(rs.getString("Task_Name")).append("</i> ")
+                    .append("<span style='color: #6c757d; font-size: 0.9em;'>(Due: ").append(rs.getString("Deadline")).append(")</span></li>");
+            }
+            
+            if(hasRunning){
+                html.append("</ul>");
+            }
+            else{
+                html.append("<p style='color: #6c757d; font-style: italic;'>No active tasks currently running.</p>");
+            }
+            
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<p style='color: red;'>Error loading running tasks.</p>";
+        }
+        
+        return html.toString();
+    }
+
+    // progress bars
+    public String getProjectProgressHTML(int departmentId){
+        StringBuilder html = new StringBuilder();
+    
+        String query = "SELECT p.Project_ID, p.Project_Name, " +
+                       "COUNT(t.Task_ID) AS Total_Tasks, " +
+                       "SUM(CASE WHEN t.Status = 'Completed' THEN 1 ELSE 0 END) AS Completed_Tasks " +
+                       "FROM PROJECT p " +
+                       "LEFT JOIN TASK t ON p.Project_ID = t.Project_ID " +
+                       "WHERE p.Department_ID = ? " +
+                       "GROUP BY p.Project_ID, p.Project_Name";
+                   
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+         
+            stmt.setInt(1, departmentId);
+            ResultSet rs = stmt.executeQuery();
+        
+            boolean hasProjects = false;
+            
+            while(rs.next()){
+                hasProjects = true;
+                String projName = rs.getString("Project_Name");
+                int total = rs.getInt("Total_Tasks");
+                int completed = rs.getInt("Completed_Tasks");
+            
+                int percentage = (total == 0) ? 0 : (int) Math.round(((double) completed / total) * 100);
+            
+                html.append("<div style='margin-bottom: 15px;'>")
+                    .append("<div style='display: flex; justify-content: space-between; margin-bottom: 4px;'>")
+                    .append("<b>").append(projName).append("</b>")
+                    .append("<span>").append(completed).append("/").append(total).append(" tasks (").append(percentage).append("%)</span>")
+                    .append("</div>")
+                    // Progress Bar Container
+                    .append("<div style='background: #e9ecef; border-radius: 6px; overflow: hidden; height: 18px;'>")
+                    // Filled Progress Indicator
+                    .append("<div style='width: ").append(percentage).append("%; background: #28a745; height: 100%; transition: width 0.4s;'></div>")
+                    .append("</div>")
+                    .append("</div>");
+            }
+        
+            if(!hasProjects){
+                html.append("<p style='color: #6c757d; font-style: italic;'>No projects registered for this department.</p>");
+            }
+        
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<p style='color: red;'>Error calculating project progress.</p>";
+        }
+    
+        return html.toString();
     }
 }
