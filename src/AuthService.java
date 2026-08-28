@@ -159,15 +159,17 @@ public class AuthService{
         return "No pending tasks at the moment.";
     }
 
-    // generates html options for employees in a specific department.. except the boss
-    public String getEmployeeDropdownHTML(int departmentId, int supervisorId){
+    // generates html options for employees in a specific department
+    public String getEmployeeDropdownHTML(int departmentId, int supervisorId) {
         StringBuilder html = new StringBuilder();
-        String query = "SELECT Employee_ID, First_Name, Last_Name FROM EMPLOYEE WHERE Department_ID = ? AND Employee_ID != ?";
+        String query = "SELECT Employee_ID, First_Name, Last_Name FROM EMPLOYEE WHERE Department_ID = ?";
+        
         try(Connection conn = DatabaseConnection.getConnection();
         PreparedStatement stmt = conn.prepareStatement(query)){
+             
             stmt.setInt(1, departmentId);
-            stmt.setInt(2, supervisorId); // supervisor wont assign tasks to himself
             ResultSet rs = stmt.executeQuery();
+            
             while(rs.next()){
                 html.append("<option value='").append(rs.getInt("Employee_ID")).append("'>")
                     .append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name"))
@@ -283,29 +285,40 @@ public class AuthService{
     public String getOverdueTasksHTML(int supervisorId){
         StringBuilder html = new StringBuilder();
         
-        // query finds incomplete tasks where the deadline is older than today, under running supervisor only
-        String query = "SELECT e.First_Name, e.Last_Name, t.Task_Name, t.Deadline " +
+        String query = "SELECT p.Project_Name, e.First_Name, e.Last_Name, t.Task_Name, t.Deadline " +
                        "FROM TASK t " +
                        "JOIN EMPLOYEE e ON t.Employee_ID = e.Employee_ID " +
-                       "WHERE e.Supervisor_ID = ? AND t.Status != 'Completed' AND t.Deadline < CURDATE()";
+                       "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
+                       "WHERE (e.Supervisor_ID = ? OR e.Employee_ID = ?) AND t.Status != 'Completed' AND t.Deadline < CURDATE() " +
+                       "ORDER BY p.Project_Name";
                        
         try(Connection conn = DatabaseConnection.getConnection();
         PreparedStatement stmt = conn.prepareStatement(query)){
              
             stmt.setInt(1, supervisorId);
+            stmt.setInt(2, supervisorId);
             ResultSet rs = stmt.executeQuery();
             
+            String currentProject = "";
             boolean hasOverdue = false;
             
             while(rs.next()){
-                if(!hasOverdue){
-                    html.append("<ul style='color: #dc3545; font-weight: bold;'>");        // red tect list
-                    hasOverdue = true;
+                hasOverdue = true;
+                String projName = rs.getString("Project_Name");
+                
+                // if a new project, create the same style header as the other sections
+                if(!projName.equals(currentProject)){
+                    if(!currentProject.isEmpty()){
+                        html.append("</ul>"); 
+                    }
+                    html.append("<h4 style='color: #856404; margin-bottom: 5px; margin-top: 15px;'>Project: ").append(projName).append("</h4><ul style='margin-top: 5px; color: #dc3545; font-weight: bold;'>");
+                    currentProject = projName;
                 }
-                html.append("<li>")
-                    .append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name"))
-                    .append(" - <i>").append(rs.getString("Task_Name")).append("</i> ")
-                    .append("(Due: ").append(rs.getString("Deadline")).append(")</li>");
+                
+                html.append("<li style='margin-bottom: 5px;'>")
+                    .append("<b>").append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name")).append("</b> - ")
+                    .append("<i>").append(rs.getString("Task_Name")).append("</i> ")
+                    .append("<span style='font-size: 0.9em;'>(Due: ").append(rs.getString("Deadline")).append(")</span></li>");
             }
             
             if(hasOverdue){
@@ -324,20 +337,21 @@ public class AuthService{
         return html.toString();
     }
 
-    public String getCompletedTasksByProjectHTML(int supervisorId){
+    public String getCompletedTasksByProjectHTML(int supervisorId) {
         StringBuilder html = new StringBuilder();
         
         String query = "SELECT p.Project_Name, e.First_Name, e.Last_Name, t.Task_Name " +
                        "FROM TASK t " +
                        "JOIN EMPLOYEE e ON t.Employee_ID = e.Employee_ID " +
                        "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
-                       "WHERE e.Supervisor_ID = ? AND t.Status = 'Completed' " +
-                       "ORDER BY p.Project_Name";                // sorting by project groups them together
+                       "WHERE (e.Supervisor_ID = ? OR e.Employee_ID = ?) AND t.Status = 'Completed' " +
+                       "ORDER BY p.Project_Name"; 
                        
         try(Connection conn = DatabaseConnection.getConnection();
         PreparedStatement stmt = conn.prepareStatement(query)){
              
             stmt.setInt(1, supervisorId);
+            stmt.setInt(2, supervisorId); // second parameter for the OR condition
             ResultSet rs = stmt.executeQuery();
             
             String currentProject = "";
@@ -347,10 +361,9 @@ public class AuthService{
                 hasCompleted = true;
                 String projName = rs.getString("Project_Name");
                 
-                // if we looking at a new project, create a new heading!
                 if(!projName.equals(currentProject)){
                     if(!currentProject.isEmpty()){
-                        html.append("</ul>");     // close previous list
+                        html.append("</ul>"); 
                     }
                     html.append("<h4 style='color: #17a2b8; margin-bottom: 5px; margin-top: 15px;'>Project: ").append(projName).append("</h4><ul style='margin-top: 5px;'>");
                     currentProject = projName;
@@ -378,21 +391,21 @@ public class AuthService{
     }
 
     //collectrs active tasks
-    public String getRunningTasksByProjectHTML(int supervisorId){
+    public String getRunningTasksByProjectHTML(int supervisorId) {
         StringBuilder html = new StringBuilder();
         
-        // query finds tasks that are NOT completed AND the deadline is today or in the future
         String query = "SELECT p.Project_Name, e.First_Name, e.Last_Name, t.Task_Name, t.Deadline " +
                        "FROM TASK t " +
                        "JOIN EMPLOYEE e ON t.Employee_ID = e.Employee_ID " +
                        "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
-                       "WHERE e.Supervisor_ID = ? AND t.Status != 'Completed' AND t.Deadline >= CURDATE() " +
+                       "WHERE (e.Supervisor_ID = ? OR e.Employee_ID = ?) AND t.Status != 'Completed' AND t.Deadline >= CURDATE() " +
                        "ORDER BY p.Project_Name";
                        
         try(Connection conn = DatabaseConnection.getConnection();
-        PreparedStatement stmt = conn.prepareStatement(query)){
+        PreparedStatement stmt = conn.prepareStatement(query)) {
              
             stmt.setInt(1, supervisorId);
+            stmt.setInt(2, supervisorId); // second parameter for the OR condition
             ResultSet rs = stmt.executeQuery();
             
             String currentProject = "";
@@ -402,10 +415,9 @@ public class AuthService{
                 hasRunning = true;
                 String projName = rs.getString("Project_Name");
                 
-                // if we hit a new project, create a new heading
                 if(!projName.equals(currentProject)){
                     if(!currentProject.isEmpty()){
-                        html.append("</ul>"); // close previous list
+                        html.append("</ul>"); 
                     }
                     html.append("<h4 style='color: #0056b3; margin-bottom: 5px; margin-top: 15px;'>Project: ").append(projName).append("</h4><ul style='margin-top: 5px;'>");
                     currentProject = projName;
@@ -485,5 +497,166 @@ public class AuthService{
         }
     
         return html.toString();
+    }
+
+    // ets the active task ID so employee doesn't have to manually select it
+    public int getActiveTaskId(int employeeId){
+        String query = "SELECT Task_ID FROM TASK WHERE Employee_ID = ? AND Status != 'Completed' LIMIT 1";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            if(rs.next()) return rs.getInt("Task_ID");
+        }
+        catch(SQLException e){ 
+            e.printStackTrace(); 
+        }
+        return -1;     //  no active task found
+    }
+
+    public String[] getActiveTaskInfo(int employeeId) {
+        String query = "SELECT t.Task_Name, p.Project_Name FROM TASK t " +
+                       "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
+                       "WHERE t.Employee_ID = ? AND t.Status != 'Completed' LIMIT 1";
+                       
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+             
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            if(rs.next()){
+                return new String[] { rs.getString("Task_Name"), rs.getString("Project_Name") };
+            }
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+        }
+        return new String[] {"Unknown Task", "Unknown Project"};
+    }
+
+    // inserts the daily work hours into the database
+    public boolean logWorkHours(int employeeId, int taskId, String logDate, double hours) {
+        String query = "INSERT INTO TIME_LOG (Employee_ID, Task_ID, Log_Date, Hours_Worked) VALUES (?, ?, ?, ?)";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+            
+            stmt.setInt(1, employeeId);
+            stmt.setInt(2, taskId);
+            stmt.setString(3, logDate);
+            stmt.setDouble(4, hours);
+            
+            int rowsInserted = stmt.executeUpdate();
+            return rowsInserted > 0;
+            
+        }
+        catch(SQLException e){
+            System.out.println("Database error during logging hours:");
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // total hours in last 7 days
+    public double getWeeklyHours(int employeeId){
+        String query = "SELECT COALESCE(SUM(Hours_Worked), 0) AS Weekly_Hours " +
+                       "FROM TIME_LOG WHERE Employee_ID = ? AND Log_Date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getDouble("Weekly_Hours");
+        }
+        catch (SQLException e){
+            e.printStackTrace();
+        }
+        return 0.0;
+    }
+
+    // visuals
+    public String getEmployeeWorkSummaryHTML(int employeeId) {
+        StringBuilder html = new StringBuilder();
+        
+        // joins TASK, PROJECT, and TIME_LOG, grouping by task to sum up the hours
+        String query = "SELECT t.Task_Name, t.Status, p.Project_Name, " +
+                       "COALESCE(SUM(l.Hours_Worked), 0) AS Total_Hours " +
+                       "FROM TASK t " +
+                       "JOIN PROJECT p ON t.Project_ID = p.Project_ID " +
+                       "LEFT JOIN TIME_LOG l ON t.Task_ID = l.Task_ID " +
+                       "WHERE t.Employee_ID = ? " +
+                       "GROUP BY t.Task_ID, t.Task_Name, t.Status, p.Project_Name " +
+                       "ORDER BY CASE WHEN t.Status = 'Completed' THEN 1 ELSE 0 END, t.Task_ID DESC";
+                       
+        try (Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+             
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            boolean hasTasks = false;
+            
+            while(rs.next()){
+                hasTasks = true;
+                String taskName = rs.getString("Task_Name");
+                String projName = rs.getString("Project_Name");
+                String status = rs.getString("Status");
+                double hours = rs.getDouble("Total_Hours");
+                
+                if("Completed".equalsIgnoreCase(status)){
+                    html.append("<div style='background: #e9ecef; border-left: 5px solid #28a745; padding: 15px; margin-bottom: 15px; border-radius: 4px;'>")
+                        .append("<h4 style='margin: 0 0 10px 0; color: #343a40;'>&#10004; Finished Task: ").append(taskName).append("</h4>")
+                        .append("<p style='margin: 0; color: #495057;'>Project: <b>").append(projName).append("</b></p>")
+                        .append("<p style='margin: 5px 0 0 0; color: #28a745; font-weight: bold;'>Total Time Invested: ").append(hours).append(" hours</p>")
+                        .append("</div>");
+                }
+                else{
+                    html.append("<div style='background: #e2eef9; border-left: 5px solid #007bff; padding: 15px; margin-bottom: 15px; border-radius: 4px;'>")
+                        .append("<h4 style='margin: 0 0 10px 0; color: #0056b3;'>&#9654; Current Task: ").append(taskName).append("</h4>")
+                        .append("<p style='margin: 0; color: #495057;'>Project: <b>").append(projName).append("</b></p>")
+                        
+                        // flexbox to align textr left righty
+                        .append("<div style='display: flex; justify-content: space-between; align-items: flex-end; margin-top: 5px;'>")
+                        .append("<p style='margin: 0; color: #007bff; font-weight: bold;'>Time Logged So Far: ").append(hours).append(" hours</p>")
+                        
+                        // compltee button form
+                        .append("<form action='/api/completeTask' method='POST' style='margin: 0;'>")
+                        .append("<input type='hidden' name='empId' value='").append(employeeId).append("'>")
+                        .append("<button type='submit' style='padding: 8px 15px; background: #28a745; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; font-size: 13px;'>Mark Task as Completed</button>")
+                        .append("</form>")
+                        
+                        .append("</div>") // close flex container
+                        .append("</div>"); // Close blue box
+                }
+            }
+            
+            if(!hasTasks){
+                html.append("<p style='color: #6c757d; font-style: italic;'>No task history found.</p>");
+            }
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<p style='color: red;'>Error generating work summary.</p>";
+        }
+        return html.toString();
+    }
+
+    // calculates the average hours per working day over the last 30 days
+    public double getAverageDailyProductivity(int employeeId){
+        String query = "SELECT COALESCE(SUM(Hours_Worked) / NULLIF(COUNT(DISTINCT Log_Date), 0), 0) AS Avg_Daily_Hours " +
+                       "FROM TIME_LOG WHERE Employee_ID = ? AND Log_Date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
+                       
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
+             
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            
+            if(rs.next()){
+                double avg = rs.getDouble("Avg_Daily_Hours");
+                return Math.round(avg * 10.0) / 10.0;       // rounded to 1 decimal place
+            }
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+        }
+        return 0.0;
     }
 }
