@@ -659,4 +659,250 @@ public class AuthService{
         }
         return 0.0;
     }
+    
+    public String getCompanyStructureHTML() {
+        StringBuilder html = new StringBuilder();
+        
+        // group employees by department and role and count them
+        String query = "SELECT d.Department_Name, e.Role, COUNT(e.Employee_ID) AS Headcount " +
+                       "FROM EMPLOYEE e " +
+                       "JOIN DEPARTMENT d ON e.Department_ID = d.Department_ID " +
+                       "GROUP BY d.Department_Name, e.Role " +
+                       "ORDER BY d.Department_Name, e.Role";
+
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query);
+        ResultSet rs = stmt.executeQuery()){
+
+            String currentDept = "";
+            boolean first = true;
+
+            // css grid container
+            html.append("<div style='display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;'>");
+
+            while(rs.next()){
+                String deptName = rs.getString("Department_Name");
+                String role = rs.getString("Role");
+                int count = rs.getInt("Headcount");
+
+                //new department new card
+                if(!deptName.equals(currentDept)){
+                    if(!first){
+                        html.append("</ul></div>"); // close previous card
+                    }
+                    
+                    // new dept card
+                    html.append("<div style='background: white; border-top: 4px solid #343a40; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); padding: 20px;'>")
+                        .append("<h3 style='margin: 0 0 15px 0; color: #343a40; border-bottom: 1px solid #eee; padding-bottom: 10px;'>")
+                        .append(deptName).append("</h3>")
+                        .append("<ul style='list-style-type: none; padding: 0; margin: 0;'>");
+                        
+                    currentDept = deptName;
+                    first = false;
+                }
+
+                // specific role and its headcount as a row 
+                html.append("<li style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: #495057; font-size: 15px;'>")
+                    .append("<span>").append(role).append("</span>")
+                    .append("<span style='background: #e2eef9; color: #0056b3; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 13px;'>").append(count).append("</span>")
+                    .append("</li>");
+            }
+
+            if(!first){
+                html.append("</ul></div>"); // close the last card
+            }
+            else{
+                html.append("<p style='color: #6c757d;'>No department data available.</p>");
+            }
+
+            html.append("</div>"); // close grid container
+
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<p style='color: red;'>Error loading company structure.</p>";
+        }
+
+        return html.toString();
+    }
+
+    // employee directory
+    public String getEmployeeDirectoryHTML(){
+        StringBuilder html = new StringBuilder();
+        
+        String query = "SELECT e.Employee_ID, e.First_Name, e.Last_Name, d.Department_Name, e.Role, " +
+                       "COALESCE(e.Status, 'Active') AS Status " + 
+                       "FROM EMPLOYEE e " +
+                       "JOIN DEPARTMENT d ON e.Department_ID = d.Department_ID " +
+                       "ORDER BY e.First_Name, e.Last_Name";
+
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query);
+        ResultSet rs = stmt.executeQuery()){
+
+            while(rs.next()){
+                String name = rs.getString("First_Name") + " " + rs.getString("Last_Name");
+                String dept = rs.getString("Department_Name");
+                String role = rs.getString("Role");
+                String status = rs.getString("Status");
+                
+                // instant filtyering
+                html.append("<tr class='employee-row' data-name='").append(name.toLowerCase())
+                    .append("' data-dept='").append(dept.toLowerCase())
+                    .append("' data-status='").append(status.toLowerCase()).append("'>")
+                    
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>").append(rs.getInt("Employee_ID")).append("</td>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold; color: #343a40;'>").append(name).append("</td>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6; color: #495057;'>").append(dept).append("</td>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6; color: #495057;'>").append(role).append("</td>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>");
+                
+                // status
+                if("Active".equalsIgnoreCase(status)){
+                    html.append("<span style='background: #d4edda; color: #155724; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;'>Active</span>");
+                }
+                else{
+                    html.append("<span style='background: #fff3cd; color: #856404; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;'>").append(status).append("</span>");
+                }
+                
+                html.append("</td>");
+                html.append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>")
+                    .append("<form action='/api/viewHistory' method='POST' style='margin: 0;'>")
+                    .append("<input type='hidden' name='empId' value='").append(rs.getInt("Employee_ID")).append("'>")
+                    .append("<input type='hidden' name='empName' value='").append(name).append("'>")
+                    .append("<button type='submit' style='background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold;'>View History</button>")
+                    .append("</form></td>")
+                    .append("</tr>");
+            }
+        }
+        catch(SQLException e){
+            e.printStackTrace();
+            return "<tr><td colspan='5' style='color: red; padding: 12px; text-align: center;'>Database Error: Ensure 'Status' column exists in EMPLOYEE table.</td></tr>";
+        }
+        return html.toString();
+    }
+
+    // logs old role then updates new role
+    public boolean processEmployeeTransfer(int employeeId, int newDeptId, String newRole) {
+        String getOldInfoQuery = "SELECT Department_ID, Role FROM EMPLOYEE WHERE Employee_ID = ?";
+        String logHistoryQuery = "INSERT INTO employment_history (Department_ID, Employment_ID, Transfer_Date, Past_Role) VALUES (?, ?, CURDATE(), ?)";
+        String updateEmployeeQuery = "UPDATE EMPLOYEE SET Department_ID = ?, Role = ? WHERE Employee_ID = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false); // Start transaction
+
+            int oldDeptId = 0;
+            String oldRole = "";
+
+            // 1. Get current data
+            try (PreparedStatement getStmt = conn.prepareStatement(getOldInfoQuery)) {
+                getStmt.setInt(1, employeeId);
+                ResultSet rs = getStmt.executeQuery();
+                if (rs.next()) {
+                    oldDeptId = rs.getInt("Department_ID");
+                    oldRole = rs.getString("Role");
+                }
+            }
+
+            // 2. Insert into history table (Using your exact 'Employment_ID' column name)
+            try (PreparedStatement logStmt = conn.prepareStatement(logHistoryQuery)) {
+                logStmt.setInt(1, oldDeptId);
+                logStmt.setInt(2, employeeId);
+                logStmt.setString(3, oldRole);
+                logStmt.executeUpdate();
+            }
+
+            // 3. Update current employee record
+            try (PreparedStatement updateStmt = conn.prepareStatement(updateEmployeeQuery)) {
+                updateStmt.setInt(1, newDeptId);
+                updateStmt.setString(2, newRole);
+                updateStmt.setInt(3, employeeId);
+                updateStmt.executeUpdate();
+            }
+
+            conn.commit(); // Commit transaction
+            return true;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    // past role table
+    public String getEmploymentHistoryHTML(int employeeId) {
+        StringBuilder html = new StringBuilder();
+        String query = "SELECT d.Department_Name, eh.Transfer_Date, eh.Past_Role " +
+                       "FROM employment_history eh " +
+                       "JOIN DEPARTMENT d ON eh.Department_ID = d.Department_ID " +
+                       "WHERE eh.Employment_ID = ? ORDER BY eh.Transfer_Date DESC";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+             
+            stmt.setInt(1, employeeId);
+            ResultSet rs = stmt.executeQuery();
+            
+            boolean hasHistory = false;
+            while (rs.next()) {
+                hasHistory = true;
+                html.append("<tr>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>").append(rs.getString("Transfer_Date")).append("</td>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>").append(rs.getString("Department_Name")).append("</td>")
+                    .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6; font-weight: bold;'>").append(rs.getString("Past_Role")).append("</td>")
+                    .append("</tr>");
+            }
+            
+            if (!hasHistory) {
+                return "<tr><td colspan='3' style='padding: 15px; text-align: center; color: #6c757d;'>No past employment history found on record.</td></tr>";
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return "<tr><td colspan='3' style='color: red;'>Error loading history.</td></tr>";
+        }
+        return html.toString();
+    }
+
+    // Generates a dropdown of employees in a department, EXCLUDING the supervisor
+    public String getSubordinateDropdownHTML(int departmentId, int supervisorId) {
+        StringBuilder html = new StringBuilder();
+        String query = "SELECT Employee_ID, First_Name, Last_Name FROM EMPLOYEE WHERE Department_ID = ? AND Employee_ID != ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+             
+            stmt.setInt(1, departmentId);
+            stmt.setInt(2, supervisorId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                html.append("<option value='").append(rs.getInt("Employee_ID")).append("'>")
+                    .append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name"))
+                    .append("</option>");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return html.toString();
+    }
+
+    // Generates a dropdown of all departments except the one provided
+    public String getOtherDepartmentsDropdownHTML(int currentDeptId) {
+        StringBuilder html = new StringBuilder();
+        String query = "SELECT Department_ID, Department_Name FROM DEPARTMENT WHERE Department_ID != ?";
+        
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+             
+            stmt.setInt(1, currentDeptId);
+            ResultSet rs = stmt.executeQuery();
+            
+            while (rs.next()) {
+                html.append("<option value='").append(rs.getInt("Department_ID")).append("'>")
+                    .append(rs.getString("Department_Name")).append("</option>");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return html.toString();
+    }
 }

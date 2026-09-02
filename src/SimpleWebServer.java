@@ -27,6 +27,11 @@ public class SimpleWebServer{
             server.createContext("/api/logHours", new LogHoursHandler());
             server.createContext("/api/logHoursPage", new LogHoursPageHandler());
             server.createContext("/api/workSummary", new WorkSummaryHandler());
+            server.createContext("/api/companyStructure", new CompanyStructureHandler());
+            server.createContext("/api/directory", new DirectoryHandler());
+            server.createContext("/api/transferPage", new TransferPageHandler());
+            server.createContext("/api/processTransfer", new ProcessTransferHandler());
+            server.createContext("/api/viewHistory", new ViewHistoryHandler());
             
             server.setExecutor(null); 
             server.start();
@@ -79,19 +84,30 @@ public class SimpleWebServer{
                     htmlResponse += "<hr><h3>Dashboard Shortcuts</h3>" +
                                     "<div style='display: flex; gap: 10px; margin-bottom: 20px;'>" +
                                     
+                                    //worksummary
                                     "<form action='/api/workSummary' method='POST' style='margin: 0;'>" +
                                     "<input type='hidden' name='empId' value='" + emp.getEmployeeId() + "'>" +
                                     "<input type='hidden' name='empName' value='" + emp.getFirstName() + " " + emp.getLastName() + "'>" +
                                     "<button type='submit' style='padding: 10px 20px; background: #6f42c1; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold;'>View My Work Summary</button>" +
                                     "</form>" +
                                     
+                                    //loghours
                                     "<form action='/api/logHoursPage' method='POST' style='margin: 0;'>" +
                                     "<input type='hidden' name='empId' value='" + emp.getEmployeeId() + "'>" +
                                     "<input type='hidden' name='empName' value='" + emp.getFirstName() + " " + emp.getLastName() + "'>" +
                                     "<input type='hidden' name='isSupervisor' value='" + isSupervisor + "'>" + // Passing role flag here!
                                     "<button type='submit' style='padding: 10px 20px; background: #17a2b8; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold;'>Log Work Hours</button>" +
                                     "</form>" +
-                                    
+
+                                    //company structure
+                                    "<form action='/api/companyStructure' method='POST' style='margin: 0;'>" +
+                                    "<button type='submit' style='padding: 10px 20px; background: #343a40; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold;'>View Company Structure</button>" +
+                                    "</form>" +
+
+                                    //employee direvtory
+                                    "<form action='/api/directory' method='POST' style='margin: 0;'>" +
+                                    "<button type='submit' style='padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold;'>Employee Directory</button>" +
+                                    "</form>" +
                                     "</div>";
 
                     // role based interface
@@ -139,6 +155,14 @@ public class SimpleWebServer{
                                         "<input type='hidden' name='deptId' value='" + emp.getDepartmentId() + "'>" +
                                         "<input type='text' name='newProjName' placeholder='New Project Name' required style='padding: 8px; margin-right: 5px; width: 250px;'>" +
                                         "<button type='submit' style='padding: 9px 15px; background: #17a2b8; color: white; border: none; cursor: pointer; border-radius: 3px;'>Create Project</button>" +
+                                        "</form>" +
+                                        
+                                        "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 5px solid #ffc107;'>" +
+                                        "<h4>Process Employee Transfer</h4>" +
+                                        "<form action='/api/transferPage' method='POST' style='margin: 0;'>" +
+                                        "<input type='hidden' name='deptId' value='" + emp.getDepartmentId() + "'>" +
+                                        "<input type='hidden' name='supervisorId' value='" + emp.getEmployeeId() + "'>" +
+                                        "<button type='submit' style='padding: 9px 15px; background: #343a40; color: white; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;'>Initialize Transfer</button>" +
                                         "</form>" +
                                         "</div>";
                     }
@@ -675,6 +699,301 @@ public class SimpleWebServer{
                                       "<div style='text-align: center;'>" +
                                       "<button style='padding: 12px 30px; background: #343a40; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;' " +
                                       "onclick='window.history.back()'>Return to Dashboard</button>" +
+                                      "</div>" +
+                                      
+                                      "</div></body></html>";
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    static class CompanyStructureHandler implements HttpHandler{
+        @Override
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
+                
+                AuthService auth = new AuthService();
+                String cardsHTML = auth.getCompanyStructureHTML();
+                
+                String htmlResponse = "<html><body style='font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 40px;'>" +
+                                      "<div style='max-width: 1000px; margin: 0 auto;'>" +
+                                      
+                                      "<div style='text-align: center; margin-bottom: 40px;'>" +
+                                      "<h1 style='margin: 0; color: #343a40; font-size: 32px; text-transform: uppercase; letter-spacing: 2px;'>Stark Industries</h1>" +
+                                      "<h3 style='margin: 10px 0 0 0; color: #6c757d; font-weight: 400; font-size: 18px;'>Department Headcount & Role Summary</h3>" +
+                                      "</div>" +
+                                      
+                                      //all info
+                                      cardsHTML +
+                                      
+                                      //back
+                                      "<div style='text-align: center; margin-top: 40px;'>" +
+                                      "<button style='padding: 12px 30px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;' " +
+                                      "onclick='window.history.back()'>Return to Dashboard</button>" +
+                                      "</div>" +
+                                      
+                                      "</div></body></html>";
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    static class DirectoryHandler implements HttpHandler{
+        @Override
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
+                
+                AuthService auth = new AuthService();
+                String tableRows = auth.getEmployeeDirectoryHTML();
+                
+                String htmlResponse = "<html><head>" +
+                                      "<script>" +
+                                      // instatnt filter logi
+                                      "function filterDirectory() {" +
+                                      "  const searchInput = document.getElementById('searchInput').value.toLowerCase();" +
+                                      "  const deptInput = document.getElementById('deptFilter').value.toLowerCase();" +
+                                      "  const statusInput = document.getElementById('statusFilter').value.toLowerCase();" +
+                                      "  const rows = document.querySelectorAll('.employee-row');" +
+                                      "  rows.forEach(row => {" +
+                                      "    const name = row.getAttribute('data-name');" +
+                                      "    const dept = row.getAttribute('data-dept');" +
+                                      "    const status = row.getAttribute('data-status');" +
+                                      "    const matchesSearch = name.includes(searchInput);" +
+                                      "    const matchesDept = (deptInput === 'all') || (dept === deptInput);" +
+                                      "    const matchesStatus = (statusInput === 'all') || (status === statusInput);" +
+                                      "    if (matchesSearch && matchesDept && matchesStatus) {" +
+                                      "      row.style.display = '';" +
+                                      "    } else {" +
+                                      "      row.style.display = 'none';" +
+                                      "    }" +
+                                      "  });" +
+                                      "}" +
+                                      "</script>" +
+                                      "</head>" +
+                                      "<body style='font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 40px;'>" +
+                                      "<div style='max-width: 1000px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);'>" +
+                                      
+                                      "<div style='text-align: center; border-bottom: 2px solid #343a40; padding-bottom: 20px; margin-bottom: 30px;'>" +
+                                      "<h1 style='margin: 0; color: #343a40; font-size: 32px; text-transform: uppercase; letter-spacing: 2px;'>Stark Industries</h1>" +
+                                      "<h3 style='margin: 10px 0 0 0; color: #6c757d; font-weight: 400; font-size: 18px;'>Global Employee Directory</h3>" +
+                                      "</div>" +
+                                      
+                                      //filter bar
+                                      "<div style='display: flex; gap: 15px; margin-bottom: 20px; background: #e9ecef; padding: 15px; border-radius: 5px; align-items: center;'>" +
+                                      "<input type='text' id='searchInput' onkeyup='filterDirectory()' placeholder='Search by name...' style='flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 4px;'>" +
+                                      
+                                      "<select id='deptFilter' onchange='filterDirectory()' style='padding: 10px; border: 1px solid #ced4da; border-radius: 4px;'>" +
+                                      "<option value='all'>All Departments</option>" +
+                                      "<option value='software engineering'>Software Engineering</option>" +
+                                      "<option value='artificial intelligence'>Artificial Intelligence</option>" +
+                                      "<option value='cybersecurity'>Cybersecurity</option>" +
+                                      "<option value='data science'>Data Science</option>" +
+                                      "<option value='cloud computing'>Cloud Computing</option>" +
+                                      "</select>" +
+                                      
+                                      "<select id='statusFilter' onchange='filterDirectory()' style='padding: 10px; border: 1px solid #ced4da; border-radius: 4px;'>" +
+                                      "<option value='all'>All Statuses</option>" +
+                                      "<option value='active'>Active</option>" +
+                                      "<option value='on leave'>On Leave</option>" +
+                                      "</select>" +
+                                      "</div>" +
+                                      
+                                      //table
+                                      "<table style='width: 100%; border-collapse: collapse; text-align: left;'>" +
+                                      "<thead>" +
+                                      "<tr style='background-color: #343a40; color: white;'>" +
+                                      "<th style='padding: 12px; border-radius: 4px 0 0 0;'>ID</th>" +
+                                      "<th style='padding: 12px;'>Full Name</th>" +
+                                      "<th style='padding: 12px;'>Department</th>" +
+                                      "<th style='padding: 12px;'>Role</th>" +
+                                      "<th style='padding: 12px;'>Status</th>" +
+                                      "<th style='padding: 12px; border-radius: 0 4px 0 0;'>Action</th>" +
+                                      "</tr>" +
+                                      "</thead>" +
+                                      "<tbody>" +
+                                      tableRows +
+                                      "</tbody>" +
+                                      "</table>" +
+                                      
+                                      "<div style='text-align: center; margin-top: 40px;'>" +
+                                      "<button style='padding: 12px 30px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;' " +
+                                      "onclick='window.history.back()'>Return to Dashboard</button>" +
+                                      "</div>" +
+                                      
+                                      "</div></body></html>";
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    // 1. Renders the Transfer Initialization Form
+    static class TransferPageHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                BufferedReader br = new BufferedReader(isr);
+                Map<String, String> inputs = parseFormData(br.readLine());
+                
+                int deptId = Integer.parseInt(inputs.get("deptId"));
+                int supervisorId = Integer.parseInt(inputs.get("supervisorId"));
+                
+                AuthService auth = new AuthService();
+                String employeeDropdown = auth.getSubordinateDropdownHTML(deptId, supervisorId);
+                String departmentDropdown = auth.getOtherDepartmentsDropdownHTML(deptId);
+                
+                String htmlResponse = "<html><body style='font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 40px;'>" +
+                                      "<div style='max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #ffc107;'>" +
+                                      
+                                      "<h2 style='color: #343a40; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;'>Initialize Transfer</h2>" +
+                                      
+                                      "<form action='/api/processTransfer' method='POST' style='display: flex; flex-direction: column; gap: 15px; margin-top: 20px;'>" +
+                                      
+                                      "<div>" +
+                                      "<label style='font-weight: bold; display: block; margin-bottom: 5px;'>Target Employee:</label>" +
+                                      "<select name='empId' required style='padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;'>" +
+                                      "<option value='' disabled selected>Select Employee...</option>" +
+                                      employeeDropdown +
+                                      "</select>" +
+                                      "</div>" +
+                                      
+                                      "<div>" +
+                                      "<label style='font-weight: bold; display: block; margin-bottom: 5px;'>New Department:</label>" +
+                                      "<select name='newDeptId' required style='padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;'>" +
+                                      "<option value='' disabled selected>Select New Department...</option>" +
+                                      departmentDropdown +
+                                      "</select>" +
+                                      "</div>" +
+                                      
+                                      "<div>" +
+                                      "<label style='font-weight: bold; display: block; margin-bottom: 5px;'>New Role Title:</label>" +
+                                      "<input type='text' name='newRole' placeholder='e.g., Senior Systems Analyst' required style='padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;'>" +
+                                      "</div>" +
+                                      
+                                      "<div style='display: flex; justify-content: space-between; margin-top: 20px;'>" +
+                                      "<button type='button' style='padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;' onclick='window.history.back()'>Cancel</button>" +
+                                      "<button type='submit' style='padding: 10px 20px; background: #ffc107; color: #343a40; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;'>Process Transfer</button>" +
+                                      "</div>" +
+                                      
+                                      "</form></div></body></html>";
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.length());
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    // 2. Processes the Transfer and redirects to Success screen
+    // 2. Processes the Transfer and redirects to Success screen
+    static class ProcessTransferHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                BufferedReader br = new BufferedReader(isr);
+                Map<String, String> inputs = parseFormData(br.readLine());
+                
+                int empId = Integer.parseInt(inputs.get("empId"));
+                int newDeptId = Integer.parseInt(inputs.get("newDeptId"));
+                String rawRole = inputs.get("newRole");
+                String newRole = java.net.URLDecoder.decode(rawRole, java.nio.charset.StandardCharsets.UTF_8.name());
+                
+                AuthService auth = new AuthService();
+                String htmlResponse;
+                
+                // --- NEW CHECK: Does the employee have an active task? ---
+                if (auth.hasIncompleteTask(empId)) {
+                    htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
+                                   "<div style='max-width: 550px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #dc3545;'>" +
+                                   "<h2 style='color: #dc3545; margin-top: 0;'>Transfer Blocked</h2>" +
+                                   "<p style='color: #495057; line-height: 1.6;'>This employee currently has active or running tasks. They must complete their current assignment before a department transfer can be processed.</p>" +
+                                   "<button style='padding: 10px 20px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 20px;' onclick='window.history.back()'>Go Back</button>" +
+                                   "</div></body></html>";
+                } else {
+                    // Proceed with the transfer if they have no active tasks
+                    boolean success = auth.processEmployeeTransfer(empId, newDeptId, newRole);
+                    
+                    if (success) {
+                        htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
+                                       "<h2 style='color: #28a745;'>Transfer Successful!</h2>" +
+                                       "<p>The employee's previous role has been logged, and their current profile has been updated.</p>" +
+                                       "<button style='padding: 10px 20px; background: #343a40; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;' onclick='window.history.go(-2)'>Return to Dashboard</button>" +
+                                       "</body></html>";
+                    } else {
+                        htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
+                                       "<h2 style='color: #dc3545;'>Transfer Failed.</h2>" +
+                                       "<p>Check server console output for the specific SQL constraint or error message.</p>" +
+                                       "<button style='padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;' onclick='window.history.back()'>Go Back</button>" +
+                                       "</body></html>";
+                    }
+                }
+                
+                exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+                exchange.sendResponseHeaders(200, htmlResponse.getBytes().length);
+                OutputStream os = exchange.getResponseBody();
+                os.write(htmlResponse.getBytes());
+                os.close();
+            }
+        }
+    }
+
+    // 3. Renders the Employee History Table from the Directory
+    static class ViewHistoryHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
+                BufferedReader br = new BufferedReader(isr);
+                Map<String, String> inputs = parseFormData(br.readLine());
+                
+                int empId = Integer.parseInt(inputs.get("empId"));
+                String empName = inputs.get("empName");
+                
+                AuthService auth = new AuthService();
+                String historyRows = auth.getEmploymentHistoryHTML(empId);
+                
+                String htmlResponse = "<html><body style='font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 40px;'>" +
+                                      "<div style='max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05);'>" +
+                                      
+                                      "<div style='text-align: center; border-bottom: 2px solid #343a40; padding-bottom: 20px; margin-bottom: 30px;'>" +
+                                      "<h1 style='margin: 0; color: #343a40; font-size: 28px; text-transform: uppercase;'>Employment History</h1>" +
+                                      "<h3 style='margin: 10px 0 0 0; color: #007bff; font-weight: 400;'>" + empName + " (ID: " + empId + ")</h3>" +
+                                      "</div>" +
+                                      
+                                      "<table style='width: 100%; border-collapse: collapse; text-align: left;'>" +
+                                      "<thead>" +
+                                      "<tr style='background-color: #e9ecef; color: #343a40;'>" +
+                                      "<th style='padding: 12px; border-radius: 4px 0 0 0;'>Date of Transfer</th>" +
+                                      "<th style='padding: 12px;'>Past Department</th>" +
+                                      "<th style='padding: 12px; border-radius: 0 4px 0 0;'>Past Role</th>" +
+                                      "</tr>" +
+                                      "</thead>" +
+                                      "<tbody>" +
+                                      historyRows +
+                                      "</tbody>" +
+                                      "</table>" +
+                                      
+                                      "<div style='text-align: center; margin-top: 40px;'>" +
+                                      "<button style='padding: 12px 30px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 4px; font-weight: bold; text-transform: uppercase;' " +
+                                      "onclick='window.history.back()'>Return to Directory</button>" +
                                       "</div>" +
                                       
                                       "</div></body></html>";
