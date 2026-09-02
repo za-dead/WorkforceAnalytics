@@ -783,67 +783,65 @@ public class AuthService{
     }
 
     // logs old role then updates new role
-    public boolean processEmployeeTransfer(int employeeId, int newDeptId, String newRole) {
+    public boolean processEmployeeTransfer(int employeeId, int newDeptId, String newRole){
         String getOldInfoQuery = "SELECT Department_ID, Role FROM EMPLOYEE WHERE Employee_ID = ?";
         String logHistoryQuery = "INSERT INTO employment_history (Department_ID, Employment_ID, Transfer_Date, Past_Role) VALUES (?, ?, CURDATE(), ?)";
         String updateEmployeeQuery = "UPDATE EMPLOYEE SET Department_ID = ?, Role = ? WHERE Employee_ID = ?";
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            conn.setAutoCommit(false); // Start transaction
+        try(Connection conn = DatabaseConnection.getConnection()){
+            conn.setAutoCommit(false);
 
             int oldDeptId = 0;
             String oldRole = "";
 
-            // 1. Get current data
-            try (PreparedStatement getStmt = conn.prepareStatement(getOldInfoQuery)) {
+            try(PreparedStatement getStmt = conn.prepareStatement(getOldInfoQuery)){
                 getStmt.setInt(1, employeeId);
                 ResultSet rs = getStmt.executeQuery();
-                if (rs.next()) {
+                if(rs.next()){
                     oldDeptId = rs.getInt("Department_ID");
                     oldRole = rs.getString("Role");
                 }
             }
 
-            // 2. Insert into history table (Using your exact 'Employment_ID' column name)
-            try (PreparedStatement logStmt = conn.prepareStatement(logHistoryQuery)) {
+            try(PreparedStatement logStmt = conn.prepareStatement(logHistoryQuery)) {
                 logStmt.setInt(1, oldDeptId);
                 logStmt.setInt(2, employeeId);
                 logStmt.setString(3, oldRole);
                 logStmt.executeUpdate();
             }
 
-            // 3. Update current employee record
-            try (PreparedStatement updateStmt = conn.prepareStatement(updateEmployeeQuery)) {
+            try(PreparedStatement updateStmt = conn.prepareStatement(updateEmployeeQuery)){
                 updateStmt.setInt(1, newDeptId);
                 updateStmt.setString(2, newRole);
                 updateStmt.setInt(3, employeeId);
                 updateStmt.executeUpdate();
             }
 
-            conn.commit(); // Commit transaction
+            conn.commit();
             return true;
-        } catch (SQLException e) {
+        }
+        catch(SQLException e){
             e.printStackTrace();
             return false;
         }
     }
 
     // past role table
-    public String getEmploymentHistoryHTML(int employeeId) {
+    public String getEmploymentHistoryHTML(int employeeId){
         StringBuilder html = new StringBuilder();
         String query = "SELECT d.Department_Name, eh.Transfer_Date, eh.Past_Role " +
                        "FROM employment_history eh " +
                        "JOIN DEPARTMENT d ON eh.Department_ID = d.Department_ID " +
                        "WHERE eh.Employment_ID = ? ORDER BY eh.Transfer_Date DESC";
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
              
             stmt.setInt(1, employeeId);
             ResultSet rs = stmt.executeQuery();
             
             boolean hasHistory = false;
-            while (rs.next()) {
+            while(rs.next()){
                 hasHistory = true;
                 html.append("<tr>")
                     .append("<td style='padding: 12px; border-bottom: 1px solid #dee2e6;'>").append(rs.getString("Transfer_Date")).append("</td>")
@@ -852,53 +850,54 @@ public class AuthService{
                     .append("</tr>");
             }
             
-            if (!hasHistory) {
+            if(!hasHistory){
                 return "<tr><td colspan='3' style='padding: 15px; text-align: center; color: #6c757d;'>No past employment history found on record.</td></tr>";
             }
-        } catch (SQLException e) {
+        }
+        catch(SQLException e){
             e.printStackTrace();
             return "<tr><td colspan='3' style='color: red;'>Error loading history.</td></tr>";
         }
         return html.toString();
     }
 
-    // Generates a dropdown of employees in a department, EXCLUDING the supervisor
-    public String getSubordinateDropdownHTML(int departmentId, int supervisorId) {
+    public String getSubordinateDropdownHTML(int departmentId, int supervisorId){
         StringBuilder html = new StringBuilder();
         String query = "SELECT Employee_ID, First_Name, Last_Name FROM EMPLOYEE WHERE Department_ID = ? AND Employee_ID != ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query)){
              
             stmt.setInt(1, departmentId);
             stmt.setInt(2, supervisorId);
             ResultSet rs = stmt.executeQuery();
             
-            while (rs.next()) {
+            while(rs.next()){
                 html.append("<option value='").append(rs.getInt("Employee_ID")).append("'>")
                     .append(rs.getString("First_Name")).append(" ").append(rs.getString("Last_Name"))
                     .append("</option>");
             }
-        } catch (SQLException e) {
+        }
+        catch (SQLException e){
             e.printStackTrace();
         }
         return html.toString();
     }
 
-    // Generates a dropdown of ALL departments for the transfer page
-    public String getAllDepartmentsDropdownHTML() {
+    public String getAllDepartmentsDropdownHTML(){
         StringBuilder html = new StringBuilder();
         String query = "SELECT Department_ID, Department_Name FROM DEPARTMENT ORDER BY Department_ID ASC";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
+        try(Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement stmt = conn.prepareStatement(query);
+        ResultSet rs = stmt.executeQuery()) {
              
-            while (rs.next()) {
+            while(rs.next()){
                 html.append("<option value='").append(rs.getInt("Department_ID")).append("'>")
                     .append(rs.getString("Department_Name")).append("</option>");
             }
-        } catch (SQLException e) {
+        }
+        catch(SQLException e){
             e.printStackTrace();
         }
         return html.toString();

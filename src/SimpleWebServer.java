@@ -38,7 +38,7 @@ public class SimpleWebServer{
             System.out.println("Web Server is running! Waiting for browser requests on http://localhost:8080...");
             
         }
-        catch (IOException e){
+        catch(IOException e){
             System.out.println("Failed to start server.");
             e.printStackTrace();
         }
@@ -842,10 +842,10 @@ public class SimpleWebServer{
     }
 
     // 1. Renders the Transfer Initialization Form
-    static class TransferPageHandler implements HttpHandler {
+    static class TransferPageHandler implements HttpHandler{
         @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
                 InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                 BufferedReader br = new BufferedReader(isr);
                 Map<String, String> inputs = parseFormData(br.readLine());
@@ -901,12 +901,10 @@ public class SimpleWebServer{
         }
     }
 
-    // 2. Processes the Transfer and redirects to Success screen
-    // 2. Processes the Transfer and redirects to Success screen
-    static class ProcessTransferHandler implements HttpHandler {
+    static class ProcessTransferHandler implements HttpHandler{
         @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
                 InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                 BufferedReader br = new BufferedReader(isr);
                 Map<String, String> inputs = parseFormData(br.readLine());
@@ -919,25 +917,25 @@ public class SimpleWebServer{
                 AuthService auth = new AuthService();
                 String htmlResponse;
                 
-                // --- NEW CHECK: Does the employee have an active task? ---
-                if (auth.hasIncompleteTask(empId)) {
+                if(auth.hasIncompleteTask(empId)){
                     htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
                                    "<div style='max-width: 550px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #dc3545;'>" +
                                    "<h2 style='color: #dc3545; margin-top: 0;'>Transfer Blocked</h2>" +
                                    "<p style='color: #495057; line-height: 1.6;'>This employee currently has active or running tasks. They must complete their current assignment before a transfer can be processed.</p>" +
                                    "<button style='padding: 10px 20px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 20px;' onclick='window.history.back()'>Go Back</button>" +
                                    "</div></body></html>";
-                } else {
-                    // Proceed with the transfer if they have no active tasks
+                }
+                else{
                     boolean success = auth.processEmployeeTransfer(empId, newDeptId, newRole);
                     
-                    if (success) {
+                    if(success){
                         htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
                                        "<h2 style='color: #28a745;'>Transfer Successful!</h2>" +
                                        "<p>The employee's previous role has been logged, and their current profile has been updated.</p>" +
                                        "<button style='padding: 10px 20px; background: #343a40; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;' onclick='window.history.go(-2)'>Return to Dashboard</button>" +
                                        "</body></html>";
-                    } else {
+                    }
+                    else{
                         htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
                                        "<h2 style='color: #dc3545;'>Transfer Failed.</h2>" +
                                        "<p>Check server console output for the specific SQL constraint or error message.</p>" +
@@ -956,10 +954,10 @@ public class SimpleWebServer{
     }
 
     // 3. Renders the Employee History Table from the Directory
-    static class ViewHistoryHandler implements HttpHandler {
+    static class ViewHistoryHandler implements HttpHandler{
         @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if ("POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+        public void handle(HttpExchange exchange) throws IOException{
+            if("POST".equalsIgnoreCase(exchange.getRequestMethod())){
                 InputStreamReader isr = new InputStreamReader(exchange.getRequestBody(), "utf-8");
                 BufferedReader br = new BufferedReader(isr);
                 Map<String, String> inputs = parseFormData(br.readLine());
