@@ -158,11 +158,11 @@ public class SimpleWebServer{
                                         "</form>" +
                                         
                                         "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; margin-top: 15px; border-left: 5px solid #ffc107;'>" +
-                                        "<h4>Process Employee Transfer</h4>" +
+                                        "<h4>Process Employee Transfer / Promotion</h4>" +
                                         "<form action='/api/transferPage' method='POST' style='margin: 0;'>" +
                                         "<input type='hidden' name='deptId' value='" + emp.getDepartmentId() + "'>" +
                                         "<input type='hidden' name='supervisorId' value='" + emp.getEmployeeId() + "'>" +
-                                        "<button type='submit' style='padding: 9px 15px; background: #343a40; color: white; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;'>Initialize Transfer</button>" +
+                                        "<button type='submit' style='padding: 9px 15px; background: #343a40; color: white; border: none; cursor: pointer; border-radius: 3px; font-weight: bold;'>Initialize</button>" +
                                         "</form>" +
                                         "</div>";
                     }
@@ -855,12 +855,12 @@ public class SimpleWebServer{
                 
                 AuthService auth = new AuthService();
                 String employeeDropdown = auth.getSubordinateDropdownHTML(deptId, supervisorId);
-                String departmentDropdown = auth.getOtherDepartmentsDropdownHTML(deptId);
+                String departmentDropdown = auth.getAllDepartmentsDropdownHTML();
                 
                 String htmlResponse = "<html><body style='font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 40px;'>" +
                                       "<div style='max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border-top: 5px solid #ffc107;'>" +
                                       
-                                      "<h2 style='color: #343a40; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;'>Initialize Transfer</h2>" +
+                                      "<h2 style='color: #343a40; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;'>Initialize Transfer/Promotion</h2>" +
                                       
                                       "<form action='/api/processTransfer' method='POST' style='display: flex; flex-direction: column; gap: 15px; margin-top: 20px;'>" +
                                       
@@ -873,9 +873,9 @@ public class SimpleWebServer{
                                       "</div>" +
                                       
                                       "<div>" +
-                                      "<label style='font-weight: bold; display: block; margin-bottom: 5px;'>New Department:</label>" +
+                                      "<label style='font-weight: bold; display: block; margin-bottom: 5px;'>Department:</label>" +
                                       "<select name='newDeptId' required style='padding: 10px; width: 100%; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;'>" +
-                                      "<option value='' disabled selected>Select New Department...</option>" +
+                                      "<option value='' disabled selected>Select Department...</option>" +
                                       departmentDropdown +
                                       "</select>" +
                                       "</div>" +
@@ -887,7 +887,7 @@ public class SimpleWebServer{
                                       
                                       "<div style='display: flex; justify-content: space-between; margin-top: 20px;'>" +
                                       "<button type='button' style='padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;' onclick='window.history.back()'>Cancel</button>" +
-                                      "<button type='submit' style='padding: 10px 20px; background: #ffc107; color: #343a40; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;'>Process Transfer</button>" +
+                                      "<button type='submit' style='padding: 10px 20px; background: #ffc107; color: #343a40; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;'>Confirm</button>" +
                                       "</div>" +
                                       
                                       "</form></div></body></html>";
@@ -924,7 +924,7 @@ public class SimpleWebServer{
                     htmlResponse = "<html><body style='font-family: Arial; padding: 40px; text-align: center;'>" +
                                    "<div style='max-width: 550px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid #dc3545;'>" +
                                    "<h2 style='color: #dc3545; margin-top: 0;'>Transfer Blocked</h2>" +
-                                   "<p style='color: #495057; line-height: 1.6;'>This employee currently has active or running tasks. They must complete their current assignment before a department transfer can be processed.</p>" +
+                                   "<p style='color: #495057; line-height: 1.6;'>This employee currently has active or running tasks. They must complete their current assignment before a transfer can be processed.</p>" +
                                    "<button style='padding: 10px 20px; background: #6c757d; color: white; border: none; cursor: pointer; border-radius: 4px; margin-top: 20px;' onclick='window.history.back()'>Go Back</button>" +
                                    "</div></body></html>";
                 } else {

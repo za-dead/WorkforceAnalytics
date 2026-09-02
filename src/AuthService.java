@@ -885,17 +885,15 @@ public class AuthService{
         return html.toString();
     }
 
-    // Generates a dropdown of all departments except the one provided
-    public String getOtherDepartmentsDropdownHTML(int currentDeptId) {
+    // Generates a dropdown of ALL departments for the transfer page
+    public String getAllDepartmentsDropdownHTML() {
         StringBuilder html = new StringBuilder();
-        String query = "SELECT Department_ID, Department_Name FROM DEPARTMENT WHERE Department_ID != ?";
+        String query = "SELECT Department_ID, Department_Name FROM DEPARTMENT ORDER BY Department_ID ASC";
         
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
              
-            stmt.setInt(1, currentDeptId);
-            ResultSet rs = stmt.executeQuery();
-            
             while (rs.next()) {
                 html.append("<option value='").append(rs.getInt("Department_ID")).append("'>")
                     .append(rs.getString("Department_Name")).append("</option>");
@@ -904,5 +902,5 @@ public class AuthService{
             e.printStackTrace();
         }
         return html.toString();
-    }
+    }   
 }
